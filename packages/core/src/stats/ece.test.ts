@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { equalMassBins, expectedCalibrationError } from './ece.ts';
+import {
+  calibrationByStratum,
+  calibrationTest,
+  equalMassBins,
+  expectedCalibrationError,
+} from './ece.ts';
 import type { Prediction } from './ece.ts';
+import { mulberry32 } from './random.ts';
 
 const preds = (rows: readonly (readonly [number, boolean])[]): Prediction[] =>
   rows.map(([confidence, correct]) => ({ confidence, correct }));
@@ -94,5 +100,94 @@ describe('expectedCalibrationError', () => {
     expect(() => expectedCalibrationError([])).toThrow(RangeError);
     expect(() => expectedCalibrationError(preds([[1.2, true]]))).toThrow(RangeError);
     expect(() => expectedCalibrationError(preds([[NaN, true]]))).toThrow(RangeError);
+  });
+});
+
+/** n predictions at a fixed confidence, with exactly ⌊n·accuracy⌋ correct, evenly spread. */
+const evenly = (n: number, confidence: number, accuracy: number): Prediction[] =>
+  Array.from({ length: n }, (_, i) => ({
+    confidence,
+    correct: Math.floor((i + 1) * accuracy) > Math.floor(i * accuracy),
+  }));
+
+describe('calibrationTest (consistency resampling)', () => {
+  it('certain and always right: ECE 0, no noise, p-value 1', () => {
+    // Under H₀ every y* = 1, so every ECE* = 0 ≥ 0: p = (1 + B)/(B + 1) = 1.
+    const result = calibrationTest(evenly(10, 1, 1), { iterations: 99 });
+    expect(result).toEqual({
+      n: 10,
+      ece: 0,
+      expectedNoise: 0,
+      excess: 0,
+      pValue: 1,
+      iterations: 99,
+    });
+  });
+
+  it('certain and always wrong: excess 1, smallest possible p-value 1/(B + 1)', () => {
+    const result = calibrationTest(evenly(10, 1, 0), { iterations: 99 });
+    expect(result.ece).toBe(1);
+    expect(result.excess).toBe(1);
+    expect(result.pValue).toBeCloseTo(1 / 100, 12);
+  });
+
+  it('expected noise matches √(2/π)·Σ_b (n_b/n)·√(p̄_b(1 − p̄_b)/n_b) on large bins', () => {
+    // 5 bins of 400 predictions, each bin at a constant confidence. With equal
+    // confidences inside a bin the formula is exact up to the normal
+    // approximation (0.1% from the exact binomial value here).
+    const confidences = [0.55, 0.65, 0.75, 0.85, 0.95];
+    const predictions = confidences.flatMap((c) => evenly(400, c, c));
+    const formula =
+      Math.sqrt(2 / Math.PI) *
+      confidences.reduce((sum, p) => sum + (400 / 2000) * Math.sqrt((p * (1 - p)) / 400), 0);
+    expect(formula).toBeCloseTo(0.01582, 5);
+    const { expectedNoise } = calibrationTest(predictions, { seed: 11 });
+    expect(Math.abs(expectedNoise - formula) / formula).toBeLessThan(0.03);
+  });
+
+  it('does not reject data drawn from the stated confidences', () => {
+    const random = mulberry32(2024);
+    const predictions = Array.from({ length: 500 }, (_, i) => {
+      const confidence = 0.5 + (0.5 * i) / 500;
+      return { confidence, correct: random() < confidence };
+    });
+    const result = calibrationTest(predictions, { seed: 5 });
+    expect(result.pValue).toBeGreaterThan(0.05);
+    expect(Math.abs(result.excess)).toBeLessThan(0.02);
+  });
+
+  it('rejects an overconfident model', () => {
+    // Claims 0.9, is right half of the time.
+    const result = calibrationTest(evenly(200, 0.9, 0.5), { iterations: 999 });
+    expect(result.ece).toBeCloseTo(0.4, 12);
+    expect(result.excess).toBeGreaterThan(0.35);
+    expect(result.pValue).toBeCloseTo(1 / 1000, 12);
+  });
+
+  it('is reproducible with the same seed and validates its options', () => {
+    const data = evenly(100, 0.7, 0.6);
+    expect(calibrationTest(data, { seed: 3 })).toEqual(calibrationTest(data, { seed: 3 }));
+    expect(() => calibrationTest(data, { iterations: 0 })).toThrow(RangeError);
+    expect(() => calibrationTest([])).toThrow(RangeError);
+  });
+});
+
+describe('calibrationByStratum', () => {
+  it('reveals miscalibration that pooling dilutes: ECE_pooled = (1 − w)·ECE_rest', () => {
+    // rest: 300 mentions at confidence 0.8, accuracy 0.72 → ECE_rest = 0.08.
+    // explicit: 200 identifiers at confidence 1, all correct → ECE = 0.
+    // w = 200/500 = 0.4. Pooled, the explicit ones fill the top 2 of 5 bins:
+    // ECE_pooled = (300 · 0.08 + 0)/500 = 0.048, which would pass a 0.05 target.
+    const rest = evenly(300, 0.8, 0.72).map((p) => ({ ...p, stratum: 'rest' }));
+    const explicit = evenly(200, 1, 1).map((p) => ({ ...p, stratum: 'explicit' }));
+    const all = [...explicit, ...rest];
+
+    expect(expectedCalibrationError(all)).toBeCloseTo(0.048, 12);
+
+    const byStratum = calibrationByStratum(all, { iterations: 200 });
+    expect([...byStratum.keys()]).toEqual(['explicit', 'rest']);
+    expect(byStratum.get('rest')?.ece).toBeCloseTo(0.08, 12);
+    expect(byStratum.get('rest')?.n).toBe(300);
+    expect(byStratum.get('explicit')?.ece).toBe(0);
   });
 });
