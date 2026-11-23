@@ -1,0 +1,57 @@
+{
+  "specVersion": "0.1.0",
+  "content": {
+    "url": "https://example.org/blog/medieval-mysteries",
+    "hash": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+  },
+  "works": [
+    {
+      "id": "wikidata:Q172850",
+      "type": "book",
+      "title": "Il nome della rosa",
+      "authors": ["Umberto Eco"],
+      "year": 1980,
+      "identifiers": { "wikidata": "Q172850" },
+      "links": [{ "label": "Wikidata", "url": "https://www.wikidata.org/wiki/Q172850" }]
+    },
+    {
+      "id": "wikidata:Q12411055",
+      "type": "book",
+      "title": "Sapiens: A Brief History of Humankind",
+      "authors": ["Yuval Noah Harari"],
+      "year": 2011,
+      "identifiers": { "wikidata": "Q12411055" },
+      "links": [{ "label": "Wikidata", "url": "https://www.wikidata.org/wiki/Q12411055" }]
+    }
+  ],
+  "mentions": [
+    {
+      "id": "m1",
+      "surface": "Il nome della rosa",
+      "anchor": {
+        "kind": "text",
+        "exact": "Il nome della rosa",
+        "prefix": "come racconta Eco ne ",
+        "suffix": ", l'abbazia è un labirinto",
+        "startHint": 1840
+      },
+      "workId": "wikidata:Q172850",
+      "p": 0.97,
+      "source": "auto"
+    },
+    {
+      "id": "m2",
+      "surface": "Sapiens",
+      "anchor": {
+        "kind": "text",
+        "exact": "Sapiens",
+        "prefix": "e, come scrive Harari in ",
+        "suffix": ", le storie condivise"
+      },
+      "workId": "wikidata:Q12411055",
+      "p": 0.92,
+      "source": "auto",
+      "x-reviewed": true
+    }
+  ]
+}

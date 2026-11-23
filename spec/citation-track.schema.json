@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:citestar:citation-track:0.1.0",
+  "title": "Open Citation Track",
+  "description": "The works mentioned in a piece of content (text, video, audio) and where each mention occurs. Version 0.1.0.",
+  "type": "object",
+  "required": ["specVersion", "content", "works", "mentions"],
+  "properties": {
+    "specVersion": {
+      "description": "Semantic version of the format this track follows.",
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "content": {
+      "description": "The content the citations refer to.",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string", "format": "uri" },
+        "hash": {
+          "description": "SHA-256 of the content, as \"sha256:\" followed by 64 lowercase hex digits.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "durationSec": { "type": "number", "minimum": 0 }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
+    },
+    "works": { "type": "array", "items": { "$ref": "#/$defs/work" } },
+    "mentions": { "type": "array", "items": { "$ref": "#/$defs/mention" } }
+  },
+  "patternProperties": { "^x-": true },
+  "additionalProperties": false,
+  "$defs": {
+    "workId": {
+      "description": "Namespaced identifier: \"wikidata:Q…\" (canonical), or a fallback such as \"doi:…\", \"isbn:…\", \"tmdb:…\".",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:\\S+$"
+    },
+    "workType": {
+      "enum": [
+        "book",
+        "paper",
+        "article",
+        "video",
+        "film",
+        "series",
+        "podcast",
+        "talk",
+        "song",
+        "other"
+      ]
+    },
+    "work": {
+      "type": "object",
+      "required": ["id", "type", "title", "authors", "identifiers", "links"],
+      "properties": {
+        "id": { "$ref": "#/$defs/workId" },
+        "type": { "$ref": "#/$defs/workType" },
+        "title": { "type": "string", "minLength": 1 },
+        "authors": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "year": { "type": "integer" },
+        "identifiers": {
+          "description": "Identifiers by scheme, e.g. {\"wikidata\": \"Q172850\", \"isbn13\": \"…\"}.",
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "url"],
+            "properties": {
+              "label": { "type": "string", "minLength": 1 },
+              "url": { "type": "string", "format": "uri" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "coverUrl": { "type": "string", "format": "uri" }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
+    },
+    "timeAnchor": {
+      "description": "Seconds from the start of the media. The rule start ≤ end is checked outside JSON Schema.",
+      "type": "object",
+      "required": ["kind", "start", "end"],
+      "properties": {
+        "kind": { "const": "time" },
+        "start": { "type": "number", "minimum": 0 },
+        "end": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "textAnchor": {
+      "description": "W3C Web Annotation TextQuoteSelector, plus an optional character offset hint.",
+      "type": "object",
+      "required": ["kind", "exact", "prefix", "suffix"],
+      "properties": {
+        "kind": { "const": "text" },
+        "exact": { "type": "string", "minLength": 1 },
+        "prefix": { "type": "string" },
+        "suffix": { "type": "string" },
+        "startHint": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "mention": {
+      "type": "object",
+      "required": ["id", "surface", "anchor", "workId", "p", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "surface": {
+          "description": "The exact words spoken or written.",
+          "type": "string",
+          "minLength": 1
+        },
+        "anchor": { "oneOf": [{ "$ref": "#/$defs/timeAnchor" }, { "$ref": "#/$defs/textAnchor" }] },
+        "workId": {
+          "description": "Id of a work in \"works\", or null when the mention is not linked (NIL).",
+          "oneOf": [{ "$ref": "#/$defs/workId" }, { "type": "null" }]
+        },
+        "p": {
+          "description": "Calibrated confidence.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source": { "enum": ["creator", "auto"] }
+      },
+      "patternProperties": { "^x-": true },
+      "additionalProperties": false
+    }
+  }
+}

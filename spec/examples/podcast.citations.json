@@ -1,0 +1,70 @@
+{
+  "specVersion": "0.1.0",
+  "content": {
+    "url": "https://example.org/podcast/episode-42.mp3",
+    "durationSec": 3120
+  },
+  "works": [
+    {
+      "id": "wikidata:Q190192",
+      "type": "book",
+      "title": "Dune",
+      "authors": ["Frank Herbert"],
+      "year": 1965,
+      "identifiers": { "wikidata": "Q190192" },
+      "links": [{ "label": "Wikidata", "url": "https://www.wikidata.org/wiki/Q190192" }]
+    },
+    {
+      "id": "wikidata:Q114819",
+      "type": "film",
+      "title": "Dune",
+      "authors": ["David Lynch"],
+      "year": 1984,
+      "identifiers": { "wikidata": "Q114819" },
+      "links": [{ "label": "Wikidata", "url": "https://www.wikidata.org/wiki/Q114819" }]
+    },
+    {
+      "id": "wikidata:Q187745",
+      "type": "song",
+      "title": "Bohemian Rhapsody",
+      "authors": ["Queen"],
+      "year": 1975,
+      "identifiers": { "wikidata": "Q187745" },
+      "links": [{ "label": "Wikidata", "url": "https://www.wikidata.org/wiki/Q187745" }]
+    }
+  ],
+  "mentions": [
+    {
+      "id": "m1",
+      "surface": "the novel Dune",
+      "anchor": { "kind": "time", "start": 312.4, "end": 313.6 },
+      "workId": "wikidata:Q190192",
+      "p": 0.94,
+      "source": "creator"
+    },
+    {
+      "id": "m2",
+      "surface": "Lynch's Dune",
+      "anchor": { "kind": "time", "start": 1288.0, "end": 1289.1 },
+      "workId": "wikidata:Q114819",
+      "p": 0.86,
+      "source": "auto"
+    },
+    {
+      "id": "m3",
+      "surface": "Bohemian Rhapsody",
+      "anchor": { "kind": "time", "start": 2410.2, "end": 2411.5 },
+      "workId": "wikidata:Q187745",
+      "p": 0.91,
+      "source": "auto"
+    },
+    {
+      "id": "m4",
+      "surface": "that essay on deserts",
+      "anchor": { "kind": "time", "start": 2950.0, "end": 2951.3 },
+      "workId": null,
+      "p": 0.55,
+      "source": "auto"
+    }
+  ]
+}
