@@ -54,17 +54,17 @@ testable without mocks and lets it run unchanged in the extension, the embed scr
 
 ## Core modules (M1b)
 
-| Module                 | Exports                                                    |
-| ---------------------- | ---------------------------------------------------------- |
-| `model.ts`             | `CitationTrack`, `Work`, `Mention`, `Anchor`, `WORK_TYPES` |
-| `validate.ts`          | `validateTrack`: rules JSON Schema cannot express          |
-| `text/normalize.ts`    | `normalizeTitle`                                           |
-| `text/jaro-winkler.ts` | `jaro`, `jaroWinkler`                                      |
-| `math/softmax.ts`      | `softmax`, `logSumExp`                                     |
-| `stats/wilson.ts`      | `wilsonInterval`                                           |
-| `stats/ece.ts`         | `expectedCalibrationError`, `equalMassBins`                |
-| `stats/bootstrap.ts`   | `bootstrapInterval`, `quantile`                            |
-| `stats/random.ts`      | `mulberry32` (seeded PRNG for reproducible evaluation)     |
+| Module                 | Exports                                                               |
+| ---------------------- | --------------------------------------------------------------------- |
+| `model.ts`             | `CitationTrack`, `Work`, `Mention`, `Anchor`, `WORK_TYPES`            |
+| `validate.ts`          | `validateTrack`: rules JSON Schema cannot express                     |
+| `text/normalize.ts`    | `normalizeTitle` (idempotent), `titleVariants`, `Normalized` brand    |
+| `text/jaro-winkler.ts` | `jaro`, `jaroWinkler`                                                 |
+| `math/softmax.ts`      | `softmax`, `logSumExp`                                                |
+| `stats/wilson.ts`      | `wilsonInterval`                                                      |
+| `stats/ece.ts`         | `expectedCalibrationError`, `calibrationTest`, `calibrationByStratum` |
+| `stats/bootstrap.ts`   | `bootstrapInterval`, `quantile`                                       |
+| `stats/random.ts`      | `mulberry32` (seeded PRNG for reproducible evaluation)                |
 
 ## Platform independence
 

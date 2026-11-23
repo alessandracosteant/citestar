@@ -131,6 +131,58 @@ position h = (B − 1)·q and interpolated linearly: x_⌊h⌋ + (h − ⌊h⌋)
 used by default in R ("type 7") and NumPy, so our numbers can be reproduced there. Example: for [1, 2, 3, 4] and
 q = 0.25, h = 0.75 and the quantile is 1 + 0.75·(2 − 1) = 1.75.
 
+### 2.1 Stratification: explicit identifiers dilute the ECE
+
+Mentions with an explicit identifier (DOI, ISBN, arXiv) get p ≈ 1 and are almost always right, so their
+contribution |acc − conf| is ≈ 0. Pooling them with the other mentions hides miscalibration. Let w be the share
+of explicit mentions. Sorted by confidence, they fill the top bins; if the bins separate the two groups,
+
+ECE_pooled = Σ_{bins of rest} (n_b/n)·|acc − conf| + Σ_{bins of explicit} (n_b/n)·0 ≈ (1 − w)·ECE_rest.
+
+Example: w = 0.4 and ECE_rest = 0.08 give ECE_pooled ≈ 0.048, which would pass a 0.05 target while the mentions
+that matter are miscalibrated. (Pooling also changes the binning of the rest: it gets about (1 − w)·5 bins instead
+of 5.) The test `calibrationByStratum` reproduces this exactly: 300 mentions at confidence 0.8 with accuracy 0.72
+plus 200 certain identifiers give a pooled ECE of 0.048.
+
+**Rule (D14):** the ECE is computed per stratum, each with its own 5 equal-mass bins: "explicit" and "rest". The
+target applies to "rest".
+
+### 2.2 Separating miscalibration from noise: consistency resampling
+
+The noise floor above is an approximation. Bröcker and Smith (2007) compute it exactly for the data at hand, by
+simulation.
+
+**Null hypothesis H₀:** the model is perfectly calibrated, i.e. the outcome of prediction i is a coin flip with
+probability pᵢ (its own confidence). Then:
+
+1. Draw yᵢ\* ~ Bernoulli(pᵢ) for every prediction, keeping the same confidences and therefore the same bins.
+2. Compute ECE\* on the simulated outcomes.
+3. Repeat B = 2000 times with the seeded generator.
+
+From the B values:
+
+- **expected noise** E[ECE\*]: the ECE that a perfect model shows on these confidences and this sample size;
+- **excess** = ECE_obs − E[ECE\*]: the miscalibration beyond what noise explains;
+- **p-value** = (1 + #{ECE\* ≥ ECE_obs}) / (B + 1): how often a perfect model looks at least as bad as ours.
+  The +1 in numerator and denominator counts the observed data as one more draw under H₀. This keeps the test
+  valid (the false-rejection rate is at most the threshold) and the p-value never 0.
+
+**Target (D14):** excess ≤ 0.05 on the "rest" stratum.
+
+**Cross-check with the formula.** For a bin of n_b predictions, the simulated accuracy is a mean of independent
+Bernoulli(pᵢ), with variance Σᵢ pᵢ(1 − pᵢ) / n_b². Writing p̄ for the mean confidence of the bin and s² for the
+spread of the confidences inside it,
+
+Σᵢ pᵢ(1 − pᵢ) / n_b = p̄(1 − p̄) − s².
+
+So when the confidences inside each bin are equal (s² = 0) and the bins are large (normal approximation),
+
+E[ECE\*] ≈ √(2/π) · Σ_b (n_b / n) · √(p̄_b(1 − p̄_b) / n_b),
+
+and when they differ the formula is an upper bound. The test suite checks the simulation against the formula on
+5 bins of 400 predictions at constant confidences 0.55…0.95: the formula gives 0.01582 (the exact binomial value
+is 0.01580), and the simulation agrees within 3%.
+
 ---
 
 ## 3. Wilson interval for precision targets
@@ -245,11 +297,56 @@ the right outcome is abstaining, which is measured separately as NIL accuracy.
 
 ## 6. Title normalization and Jaro–Winkler similarity
 
-**Normalization** (`normalizeTitle`) removes differences of form before comparing titles: Unicode NFKD splits
-"é" into "e" + a combining accent, which is then dropped; compatibility characters expand (the ligature "ﬁ"
-becomes "fi"); case, punctuation and one leading article of the title's language ("the", "il", "l'") go away.
-"Il Nome della Rosa!" and "il nome della rosa" both become "nome della rosa". It does not translate: equivalence
-across languages comes from Wikidata labels.
+**Normalization** (`normalizeTitle`) removes differences of form before comparing titles. "Il Nome della Rosa!"
+and "il nome della rosa" both become "nome della rosa". It does not translate: "Il nome della rosa" ≡ "The Name of
+the Rose" comes from Wikidata labels. It is the composition f = A ∘ T of two steps.
+
+- **T (fold and tokenize):** Unicode NFKD splits "é" into "e" + a combining accent and expands compatibility
+  characters (the ligature "ﬁ" becomes "fi"); combining marks and invisible format characters are dropped; the
+  text is lowercased; punctuation, symbols and controls become separators; the result is the list of tokens.
+  The apostrophe is punctuation, so "l'isola" gives the tokens "l", "isola".
+- **A (article rule):** with the article set 𝒜_L **of the title's language** L (English: the, a, an; Italian:
+  il, lo, la, i, gli, le, un, uno, una, l, gl), drop the first token t₁ if and only if t₁ ∈ 𝒜_L, there is a
+  second token t₂, and t₂ ∉ 𝒜_L.
+
+The language comes from the document for a mention and from the label's language tag for a Wikidata candidate.
+Using the union of all languages would be wrong: "I, Robot" in English stays "i robot", while "I promessi sposi" in
+Italian becomes "promessi sposi".
+
+**Why the condition t₂ ∉ 𝒜_L.** Take "La La Land" in Italian. Dropping the article once gives "la land", and
+normalizing that again gives "land": the function would not be idempotent. Dropping articles until none is left
+is idempotent but makes different titles collide ("La La Land" and "Land" would both become "land"). The
+condition keeps "la la land" whole.
+
+**Theorem: f(f(s)) = f(s) for every string s.** Write the output as the tokens joined by single spaces.
+
+_Lemma 1 (T is stable on its own output)._ Each token produced by T is a fixed point of the character folding:
+folding a folded character changes nothing. This was checked exhaustively on all 1,112,064 Unicode code points,
+and the property-based tests check it on random strings. Tokens contain no separators. Hence re-tokenizing tokens
+joined by single spaces gives back exactly the same list: T(join(L)) = L for every list L that T can produce,
+and for every **suffix** of such a list.
+
+_Lemma 2 (A is idempotent)._ Let L = A(K) for some token list K. Two cases.
+
+- A dropped the first token of K. Then the first token of L is the old t₂, which is not an article, so A leaves L
+  unchanged: A(L) = L.
+- A dropped nothing. Then K = L and one of the conditions failed on L itself (t₁ ∉ 𝒜_L, or there is no t₂, or
+  t₂ ∈ 𝒜_L). The same condition still fails, so A(L) = L.
+
+_Proof._ f(s) = join(A(T(s))). A(T(s)) is a suffix of T(s), so by Lemma 1 T(f(s)) = A(T(s)). Then
+f(f(s)) = join(A(T(f(s)))) = join(A(A(T(s)))) = join(A(T(s))) = f(s) by Lemma 2. ∎
+
+The same argument shows that every token of a normalized title is itself normalized: a single token never loses
+an article. `normalizedTokens` relies on this.
+
+**Type-level guarantee.** `normalizeTitle` returns the branded type
+`Normalized = string & { readonly __brand: "Normalized" }`, and the comparison functions (`jaro`, `jaroWinkler`)
+accept only that type. Passing a raw string is a compile-time error, so a comparison can never mix normalized and
+raw text. The brand exists only for the type checker: at run time it is a plain string.
+
+**Variants.** Before punctuation is removed, `titleVariants` produces the full title and, if present, the main
+title before the first ":" or spaced dash: "Dune: Part Two" → {"Dune: Part Two", "Dune"}. Hyphens inside words
+("Spider-Man") do not split. Linking (M1e) scores a mention against every variant.
 
 **Jaro similarity.** For strings a and b, two characters _match_ if they are equal and at most
 

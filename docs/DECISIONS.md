@@ -43,6 +43,7 @@ may go to the opt-in shared cache. One-click on-device ASR remains available as 
 - The gold set is measured in **mentions**: at least **500 annotated mentions** in M1f.
 - **ECE** with **5 equal-mass bins** and a **95% bootstrap confidence interval**. A perfectly calibrated model
   still shows ECE ≈ √(2/π)·√(p(1−p)/n_b) per bin. See [MATH.md §2](MATH.md#2-expected-calibration-error-and-its-noise-floor).
+  _The ECE target is replaced by D14._
 - **Precision targets are verified on the lower bound of the 95% Wilson interval**, not on the point estimate.
   See [MATH.md §3](MATH.md#3-wilson-interval-for-precision-targets).
 - **Dev/test split.** Rules are written looking only at dev. The test set comes from real sources (CC-BY or public
@@ -111,3 +112,65 @@ bring Node globals back. Pure packages (today `@citestar/core`) are therefore gu
 
 The first push goes to `main`. From M1b on, every change lands through a feature branch and a pull request, so
 that CI gates the merge.
+
+## D14 — Calibration target: stratified, beyond noise (supersedes the ECE part of D5, 2026-11-23)
+
+- The ECE is computed **per stratum**, each with its own 5 equal-mass bins: "explicit" (mentions with a DOI,
+  ISBN or arXiv identifier) and "rest". Pooled, explicit identifiers (p ≈ 1, almost always right) dilute it:
+  ECE_pooled ≈ (1 − w)·ECE_rest, so w = 0.4 and ECE_rest = 0.08 would read 0.048 and pass.
+- Noise is measured by **consistency resampling** (Bröcker & Smith 2007): under H₀ of perfect calibration,
+  simulate yᵢ\* ~ Bernoulli(pᵢ) from the same confidences, B = 2000 times with the seeded generator. Report the
+  expected noise E[ECE\*], the excess ECE_obs − E[ECE\*] and the p-value (1 + #{ECE\* ≥ ECE_obs})/(B + 1).
+- **Target: excess ≤ 0.05 on the "rest" stratum.** The bootstrap interval is still reported.
+
+See [MATH.md §2.1–2.2](MATH.md#21-stratification-explicit-identifiers-dilute-the-ece).
+
+## D15 — Title normalization rules (2026-11-23)
+
+- `normalizeTitle` is **idempotent**; proof in [MATH.md §6](MATH.md#6-title-normalization-and-jarowinkler-similarity),
+  property-based tests with fast-check.
+- A leading article is dropped only if what remains does not itself start with an article ("La La Land").
+- Articles are **per language**, never the union: the mention's language comes from the document, the label's
+  from its Wikidata language tag.
+- `Normalized` is a branded type, produced only by `normalizeTitle` and required by comparison functions.
+- Title variants (full title, main title before ":" or a spaced dash) are generated before punctuation removal,
+  for use in M1e.
+
+## Planned for later milestones (from the M1b review, 2026-11-23)
+
+### D16 — Explicit identifiers (M1c)
+
+Validated identifiers take a **separate path with a fixed p**, bypassing the logistic model.
+
+- **ISBN-10:** Σᵢ₌₁¹⁰ (11 − i)·dᵢ ≡ 0 (mod 11), with X = 10.
+- **ISBN-13:** weights 1, 3, 1, 3, …, sum ≡ 0 (mod 10), prefix 978 or 979.
+- **ISSN:** mod 11 check digit.
+- **DOI:** Crossref's recommended regex, then strip trailing punctuation (. , ;) and a trailing ")" only if
+  unbalanced.
+- **arXiv:** new format YYMM.NNNN or YYMM.NNNNN with optional vN and month 01–12; old format archive/YYMMNNN.
+- Property tests: ISBN-10 detects every single-digit error and every transposition; ISBN-13 does **not** detect
+  adjacent transpositions of digits that differ by 5 (document why).
+
+### D17 — Capitalization features depend on language and source (M1c)
+
+Italian titles use sentence case and, mid-sentence, often have no capitals; in ASR transcripts the model decides
+capitalization. Use interaction features capitalization × language and capitalization × source.
+
+### D18 — Late right boundary (M1c, M1e)
+
+The detector emits the start of a mention and a range of possible ends [e_min, e_max], closed by stops such as
+"di <Name>", punctuation or conjunctions. In M1e, one catalog query per window, and
+ê = argmax_e max_c s(m_{start..e}, c), aligning candidate labels as prefixes of the normalized window.
+
+### D19 — Initial weights are documented priors (M1c, M1f)
+
+The initial weights w are hand-written priors, documented in MATH.md with their reasoning. In M1f they are
+estimated by logistic regression with **L2 regularization**, because the features are correlated and the data
+are few.
+
+### D20 — Monge–Elkan for partial titles (M1e)
+
+Jaro–Winkler works on short strings, badly on partial titles or different word order ("la pietra filosofale" vs
+"Harry Potter e la pietra filosofale"). Add the Monge–Elkan feature
+ME(A, B) = (1/|A|)·Σ_{a∈A} max_{b∈B} JW(a, b), with A the tokens of the mention, besides the maximum of JW over
+the title variants.
