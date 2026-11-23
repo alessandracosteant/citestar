@@ -10,6 +10,10 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build": "node ../../tools/neutral-build.ts src/index.ts dist/index.js",
     "typecheck": "tsc --project tsconfig.json"
-  }
+  },
+  "files": [
+    "dist"
+  ]
 }

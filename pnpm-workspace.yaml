@@ -7,3 +7,8 @@ packages:
 minimumReleaseAge: 20160
 minimumReleaseAgeExclude:
   - '@citestar/*'
+
+# Install scripts are blocked unless listed here. esbuild's postinstall only
+# validates/optimizes the binary, which already comes from @esbuild/<platform>.
+allowBuilds:
+  esbuild: false
