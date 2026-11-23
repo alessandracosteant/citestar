@@ -9,11 +9,19 @@
   "exports": {
     ".": "./src/index.ts"
   },
-  "scripts": {
-    "build": "node ../../tools/neutral-build.ts src/index.ts dist/index.js",
-    "typecheck": "tsc --project tsconfig.json"
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
   },
   "files": [
     "dist"
-  ]
+  ],
+  "scripts": {
+    "build": "node ../../tools/neutral-build.ts src/index.ts dist/index.js && tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json"
+  }
 }
