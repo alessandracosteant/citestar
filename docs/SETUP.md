@@ -25,6 +25,25 @@ echo 'export PATH="$HOME/.local/lib/node/bin:$PATH"' >> ~/.profile
 
 Open a new terminal and check `node --version`.
 
+### Optional: verify the signature
+
+The checksum proves **integrity** (the archive matches `SHASUMS256.txt`), not **authenticity**: both files come
+from the same server, so whoever could replace one could replace the other. The Node.js releasers sign
+`SHASUMS256.txt` with GPG; their public keys are published in a separate repository,
+[nodejs/release-keys](https://github.com/nodejs/release-keys). Checking the signature against those keys moves
+the trust to a second, independent channel (GitHub). Run this in the same directory, **before** extracting:
+
+```sh
+git clone --depth 1 https://github.com/nodejs/release-keys
+curl -fsSLO "https://nodejs.org/dist/$V/SHASUMS256.txt.sig"
+gpgv --keyring ./release-keys/gpg-only-active-keys/pubring.kbx SHASUMS256.txt.sig SHASUMS256.txt
+```
+
+Expect `Good signature from "<name of a Node.js releaser>"`. A modified file gives `BAD signature` and a non-zero
+exit code. We use the **detached** signature `SHASUMS256.txt.sig`: with the clear-signed `SHASUMS256.txt.asc`,
+`gpg --verify` checks the text embedded in the `.asc`, not the separate `SHASUMS256.txt` that `sha256sum` reads.
+Use `gpg-only-active-keys` for current releases, or the `gpg` keyring for old releases signed by retired keys.
+
 > **VSCodium or VS Code installed as a Flatpak**: the integrated terminal runs inside the sandbox. The sandbox
 > sees your home directory, and the `PATH` already includes
 > `~/.var/app/com.vscodium.codium/data/node/bin`. Linking Node there makes it available in the editor's terminal
