@@ -77,9 +77,15 @@ export function jaroWinkler(
   options: JaroWinklerOptions = {},
 ): number {
   const { prefixScale = 0.1, maxPrefix = 4, boostThreshold = 0.7 } = options;
-  if (prefixScale < 0 || prefixScale * maxPrefix > 1) {
+  // The prefix length ℓ is an integer ≤ maxPrefix, so ℓ·p ≤ 1 keeps JW ≤ 1
+  // only if maxPrefix is an integer too (with 2.5, ℓ could reach 3).
+  if (!Number.isInteger(maxPrefix) || maxPrefix < 0) {
+    throw new RangeError('maxPrefix must be a non-negative integer');
+  }
+  if (!(prefixScale >= 0) || prefixScale * maxPrefix > 1) {
     throw new RangeError('prefixScale must be in [0, 1 / maxPrefix] to keep the result in [0, 1]');
   }
+  if (!Number.isFinite(boostThreshold)) throw new RangeError('boostThreshold must be finite');
 
   const similarity = jaro(a, b);
   if (similarity < boostThreshold) return similarity;

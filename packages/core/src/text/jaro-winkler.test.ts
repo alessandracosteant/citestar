@@ -70,6 +70,13 @@ describe('jaroWinkler', () => {
 
   it('rejects a prefix scale that could exceed 1, and accepts custom options', () => {
     expect(() => jaroWinkler(n('a'), n('a'), { prefixScale: 0.3 })).toThrow(RangeError);
+    // With maxPrefix 2.5 and p = 0.4 (2.5 · 0.4 = 1) a prefix of 3 would give 1.03.
+    expect(() => jaroWinkler(n('abcd'), n('abce'), { maxPrefix: 2.5, prefixScale: 0.4 })).toThrow(
+      RangeError,
+    );
+    expect(() => jaroWinkler(n('a'), n('a'), { maxPrefix: -1 })).toThrow(RangeError);
+    expect(() => jaroWinkler(n('a'), n('a'), { prefixScale: NaN })).toThrow(RangeError);
+    expect(() => jaroWinkler(n('a'), n('a'), { boostThreshold: NaN })).toThrow(RangeError);
     expect(jaroWinkler(n('abcxyz'), n('abcdef'), { boostThreshold: 0 })).toBeCloseTo(
       2 / 3 + 0.3 * (1 / 3),
       12,
