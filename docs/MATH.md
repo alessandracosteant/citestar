@@ -93,6 +93,14 @@ A perfectly calibrated model has acc = conf in every bin, so ECE = 0.
 not fixed-width bins. With fixed-width bins and a model that is usually confident, most predictions land in the
 last bin and the others are nearly empty, which makes their terms pure noise.
 
+**Ties never straddle a bin boundary.** Splitting a group of equal confidences would make the ECE depend on the
+order of the input. Four predictions at confidence 0.5, two right and two wrong, give ECE 0.5 if the right ones
+come first (bins {✓✓} and {✗✗}) and 0 if they alternate. Our models produce many ties (rules give few distinct
+scores; explicit identifiers all get the same fixed p), so the cut ⌊b·n/m⌋ moves forward to the end of the tie
+group it falls into, and cuts that coincide merge. Bins may then be fewer than m and of unequal size, but the
+ECE is a function of the set of predictions, not of their order (checked by a property-based test over random
+permutations).
+
 **Noise floor.** Even a perfectly calibrated model shows ECE > 0 on a finite sample. Take a bin with n_b
 predictions, all with true probability p. The number of correct ones is Binomial(n_b, p), so
 

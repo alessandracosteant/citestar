@@ -20,8 +20,20 @@ export function equalMassBins<T>(sorted: readonly T[], bins: number): T[][] {
   );
 }
 
-/** Non-empty equal-mass bins of predictions sorted by confidence. */
+/**
+ * Equal-mass bins of predictions sorted by confidence, **never splitting a
+ * group of equal confidences**. The cut ⌊b·n/m⌋ moves forward to the end of the
+ * tie group it falls into; cuts that coincide merge, so there may be fewer than
+ * `bins` bins, of unequal size.
+ *
+ * Without this rule the ECE would depend on the order of the input: four
+ * predictions at confidence 0.5, two right and two wrong, give ECE 0.5 if the
+ * right ones come first (bins {✓✓}, {✗✗}) and 0 if they alternate. Models with
+ * few distinct confidences (rules, fixed p for explicit identifiers) produce
+ * many ties, so this matters.
+ */
 function binPredictions(predictions: readonly Prediction[], bins: number): Prediction[][] {
+  if (!Number.isInteger(bins) || bins < 1) throw new RangeError('bins must be a positive integer');
   if (predictions.length === 0) throw new RangeError('no predictions');
   for (const { confidence } of predictions) {
     if (!(confidence >= 0 && confidence <= 1)) {
@@ -29,7 +41,17 @@ function binPredictions(predictions: readonly Prediction[], bins: number): Predi
     }
   }
   const sorted = [...predictions].sort((a, b) => a.confidence - b.confidence);
-  return equalMassBins(sorted, bins).filter((bin) => bin.length > 0);
+  const n = sorted.length;
+
+  const cuts = [0];
+  for (let b = 1; b < bins; b++) {
+    let cut = Math.floor((b * n) / bins);
+    while (cut > 0 && cut < n && sorted[cut]?.confidence === sorted[cut - 1]?.confidence) cut++;
+    if (cut > (cuts.at(-1) ?? 0) && cut < n) cuts.push(cut);
+  }
+  cuts.push(n);
+
+  return cuts.slice(1).map((end, i) => sorted.slice(cuts[i], end));
 }
 
 /**
@@ -60,9 +82,11 @@ const countCorrect = (bin: readonly Prediction[]): number =>
  *
  *   ECE = Σ_b (|B_b| / n) · |acc(B_b) − conf(B_b)|
  *
- * Predictions are sorted by confidence (ties keep their input order) and split
- * into `bins` groups of equal size. Equal-mass bins avoid the nearly empty,
- * noisy bins that fixed-width bins produce when most confidences are high.
+ * Predictions are sorted by confidence and split into `bins` groups of equal
+ * size, except that equal confidences always share a bin, so the result does
+ * not depend on the order of the input. Equal-mass bins avoid the nearly
+ * empty, noisy bins that fixed-width bins produce when most confidences are
+ * high.
  * See docs/MATH.md §2, including the noise floor of this estimate.
  */
 export function expectedCalibrationError(predictions: readonly Prediction[], bins = 5): number {

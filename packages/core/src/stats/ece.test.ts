@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -100,6 +101,8 @@ describe('expectedCalibrationError', () => {
     expect(() => expectedCalibrationError([])).toThrow(RangeError);
     expect(() => expectedCalibrationError(preds([[1.2, true]]))).toThrow(RangeError);
     expect(() => expectedCalibrationError(preds([[NaN, true]]))).toThrow(RangeError);
+    expect(() => expectedCalibrationError(preds([[0.5, true]]), 0)).toThrow(RangeError);
+    expect(() => calibrationTest(preds([[0.5, true]]), { bins: 2.5 })).toThrow(RangeError);
   });
 });
 
@@ -189,5 +192,69 @@ describe('calibrationByStratum', () => {
     expect(byStratum.get('rest')?.ece).toBeCloseTo(0.08, 12);
     expect(byStratum.get('rest')?.n).toBe(300);
     expect(byStratum.get('explicit')?.ece).toBe(0);
+  });
+});
+
+describe('ties in confidence', () => {
+  it('never splits equal confidences across bins, so input order does not matter', () => {
+    // Same four predictions in two orders. Splitting the tie would give bins
+    // {✓✓}, {✗✗} → ECE 0.5 for the first order and 0 for the second.
+    const rightFirst = preds([
+      [0.5, true],
+      [0.5, true],
+      [0.5, false],
+      [0.5, false],
+    ]);
+    const alternating = preds([
+      [0.5, true],
+      [0.5, false],
+      [0.5, true],
+      [0.5, false],
+    ]);
+    expect(expectedCalibrationError(rightFirst, 2)).toBe(0);
+    expect(expectedCalibrationError(alternating, 2)).toBe(0);
+  });
+
+  it('moves a cut to the end of its tie group', () => {
+    // n = 6, m = 3: cuts 2 and 4. Confidences .2 .5 .5 .5 .9 .9: cut 2 falls
+    // inside the .5 group and moves to 4, merging with the second cut.
+    // Bins: {.2 ✗, .5 ✓, .5 ✓, .5 ✗} and {.9 ✓, .9 ✓}.
+    //   bin 1: |k − S| = |2 − 1.7| = 0.3;  bin 2: |2 − 1.8| = 0.2
+    // ECE = (0.3 + 0.2) / 6
+    const p = preds([
+      [0.9, true],
+      [0.5, true],
+      [0.2, false],
+      [0.5, false],
+      [0.9, true],
+      [0.5, true],
+    ]);
+    expect(expectedCalibrationError(p, 3)).toBeCloseTo(0.5 / 6, 12);
+  });
+
+  it('gives the same ECE for any permutation of the input', () => {
+    const prediction = fc.record({
+      confidence: fc.constantFrom(0, 0.2, 0.5, 0.8, 1),
+      correct: fc.boolean(),
+    });
+    fc.assert(
+      fc.property(
+        fc.array(prediction, { minLength: 1, maxLength: 40 }),
+        fc.integer({ min: 1, max: 7 }),
+        fc.func(fc.integer()),
+        (data, bins, key) => {
+          const shuffled = data
+            .map((p, i) => ({ p, k: key(i) }))
+            .sort((a, b) => a.k - b.k)
+            .map(({ p }) => p);
+          return (
+            Math.abs(
+              expectedCalibrationError(data, bins) - expectedCalibrationError(shuffled, bins),
+            ) < 1e-12
+          );
+        },
+      ),
+      { numRuns: 500 },
+    );
   });
 });
