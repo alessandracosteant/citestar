@@ -16,8 +16,11 @@
  * strings do not look similar just because they share a prefix.
  *
  * Strings are compared by Unicode code point, not UTF-16 unit, so characters
- * outside the Basic Multilingual Plane count once.
+ * outside the Basic Multilingual Plane count once. Both arguments must be
+ * normalized (see normalize.ts): comparing raw strings would make "Dune" and
+ * "dune" differ.
  */
+import type { Normalized } from './normalize.ts';
 
 export interface JaroWinklerOptions {
   /** Weight p of the common-prefix bonus. Must be ≤ 1 / maxPrefix. Default 0.1. */
@@ -28,7 +31,7 @@ export interface JaroWinklerOptions {
   readonly boostThreshold?: number;
 }
 
-export function jaro(a: string, b: string): number {
+export function jaro(a: Normalized, b: Normalized): number {
   const s = Array.from(a);
   const t = Array.from(b);
   if (s.length === 0 && t.length === 0) return 1;
@@ -68,7 +71,11 @@ export function jaro(a: string, b: string): number {
   return (matches / s.length + matches / t.length + (matches - transpositions) / matches) / 3;
 }
 
-export function jaroWinkler(a: string, b: string, options: JaroWinklerOptions = {}): number {
+export function jaroWinkler(
+  a: Normalized,
+  b: Normalized,
+  options: JaroWinklerOptions = {},
+): number {
   const { prefixScale = 0.1, maxPrefix = 4, boostThreshold = 0.7 } = options;
   if (prefixScale < 0 || prefixScale * maxPrefix > 1) {
     throw new RangeError('prefixScale must be in [0, 1 / maxPrefix] to keep the result in [0, 1]');
