@@ -39,18 +39,18 @@ testable without mocks and lets it run unchanged in the extension, the embed scr
 
 ## Packages
 
-| Package              | Role                                                          | Status |
-| -------------------- | ------------------------------------------------------------- | ------ |
-| `packages/core`      | Data model, detection, linking, scoring, decision, statistics | M1b–e  |
-| `packages/resolvers` | Catalog plugins with cache, token bucket, retry with backoff  | M1d    |
-| `packages/media`     | Text and time from subtitles, ASR, OCR, PDF, DOCX             | M2–M4  |
-| `packages/ui`        | Lit web components, analytic spring engine, themes            | M2     |
-| `packages/embed`     | One-line script, React and Vue wrappers                       | M5     |
-| `packages/extension` | Browser extension (WXT, Manifest V3)                          | M3     |
-| `packages/server`    | Optional self-hosted API (Hono), opt-in shared cache          | M5     |
-| `spec/`              | Open Citation Track: JSON Schema and examples                 | M1b    |
-| `eval/`              | Gold set annotations (CC BY-SA 4.0) and metric scripts        | M1f    |
-| `tools/`             | Build and repository checks (neutral build, purity tests)     | M1a    |
+| Package              | Role                                                                         | Status |
+| -------------------- | ---------------------------------------------------------------------------- | ------ |
+| `packages/core`      | Data model, detection, linking, scoring, decision, statistics                | M1b–e  |
+| `packages/resolvers` | Catalog plugins with cache, token bucket, retry with backoff                 | M1d    |
+| `packages/media`     | Text and time from subtitles, ASR, OCR, PDF, DOCX                            | M2–M4  |
+| `packages/ui`        | Lit web components, analytic spring engine, themes                           | M2     |
+| `packages/embed`     | One-line script, React and Vue wrappers                                      | M5     |
+| `packages/extension` | Browser extension (WXT, Manifest V3)                                         | M3     |
+| `packages/server`    | Optional self-hosted API (Hono), opt-in shared cache                         | M5     |
+| `spec/`              | Open Citation Track: JSON Schema and examples                                | M1b    |
+| `eval/`              | Gold set annotations (CC BY-SA 4.0) and metric scripts                       | M1f    |
+| `tools/`             | Build and repository checks (neutral build, purity, packed-package consumer) | M1a    |
 
 ## Core modules (M1b)
 

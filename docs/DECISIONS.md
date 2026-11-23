@@ -136,6 +136,20 @@ See [MATH.md §2.1–2.2](MATH.md#21-stratification-explicit-identifiers-dilute-
 - Title variants (full title, main title before ":" or a spaced dash) are generated before punctuation removal,
   for use in M1e.
 
+## D21 — Fixes from the M1b code review (2026-11-23)
+
+- **ECE bins never split tied confidences**, so the ECE does not depend on input order. See
+  [MATH.md §2](MATH.md#2-expected-calibration-error-and-its-noise-floor).
+- **Spec version compatibility follows npm's caret rule**: same major and, while the major is 0, same minor. A
+  0.1.0 reader rejects a 0.2.0 track. See [spec/README.md](../spec/README.md#versioning-and-extensions).
+- **Packages are checked as published.** In the workspace `exports` points to the TypeScript sources; on publish,
+  `publishConfig.exports` points to `dist/` (bundle + `.d.ts`). `tools/check-pack.ts` packs each package and
+  type-checks a strict consumer against the tarball, in CI.
+- Input validation: `jaroWinkler` rejects a non-integer `maxPrefix` (it allowed results above 1) and non-finite
+  options; `wilsonInterval` rejects an infinite z; `bootstrapInterval` rejects a statistic that returns NaN or ±∞;
+  `logSumExp` no longer overflows the call stack on large arrays; `normalizeTitle` accepts POSIX locale tags
+  (`it_IT`).
+
 ## Planned for later milestones (from the M1b review, 2026-11-23)
 
 ### D16 — Explicit identifiers (M1c)

@@ -12,7 +12,8 @@ podcasts, talks, songs), shown **where and when** it is mentioned:
 Non-intrusive (never pauses, never covers subtitles or controls, no modals), private (local-first, no telemetry,
 no account), zero-config.
 
-> **Status: pre-alpha.** The toolchain is in place (milestone M1a); the detection pipeline is being built.
+> **Status: pre-alpha.** Milestone M1b: the core primitives (data model, title normalization and similarity,
+> calibration statistics) and the Open Citation Track schema are in place; detection is next.
 
 ## Documentation
 

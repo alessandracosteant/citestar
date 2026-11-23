@@ -12,8 +12,9 @@ canzoni), mostrata **dove e quando** viene nominata:
 Non invasivo (non mette mai in pausa, non copre sottotitoli né controlli, niente finestre modali), rispettoso
 della privacy (tutto in locale, nessuna telemetria, nessun account), zero configurazione.
 
-> **Stato: pre-alpha.** Gli strumenti di sviluppo sono pronti (milestone M1a); la pipeline di rilevamento è in
-> costruzione.
+> **Stato: pre-alpha.** Milestone M1b: le basi del core (modello dati, normalizzazione e somiglianza dei titoli,
+> statistiche di calibrazione) e lo schema dell'Open Citation Track sono pronti; il prossimo passo è il
+> rilevamento.
 
 ## Documentazione
 
