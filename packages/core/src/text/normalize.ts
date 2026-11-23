@@ -32,9 +32,12 @@ const ARTICLES: Readonly<Record<string, ReadonlySet<string>>> = {
 const MARKS_AND_FORMAT = /[\p{M}\p{Cf}]+/gu;
 const SEPARATORS = /[\p{P}\p{S}\p{Cc}\s]+/gu;
 
-/** Primary language subtag, lowercased: "it-IT" → "it". */
+/**
+ * Primary language subtag, lowercased: "it-IT" → "it". Also accepts the POSIX
+ * locale form with an underscore ("it_IT"), common in system settings.
+ */
 function primaryLanguage(lang: string): string {
-  return lang.split('-')[0]?.toLowerCase() ?? '';
+  return lang.trim().split(/[-_]/u)[0]?.toLowerCase() ?? '';
 }
 
 function fold(text: string): string {
@@ -83,13 +86,14 @@ export function normalizedTokens(text: Normalized): Normalized[] {
   return text === '' ? [] : (text.split(' ') as Normalized[]);
 }
 
-const MAIN_TITLE_SEPARATOR = /:|\s[-–—]\s/u;
+const MAIN_TITLE_SEPARATOR = /[:：]|\s[-–—]\s/u;
 
 /**
  * Variants of a raw title, computed before punctuation is removed: the full
- * title and, when there is a subtitle, the main title before the first ":" or
- * spaced dash (" - ", " – ", " — "). "Dune: Part Two" → ["Dune: Part Two",
- * "Dune"]. Hyphens inside words ("Spider-Man") do not split.
+ * title and, when there is a subtitle, the main title before the first colon
+ * (also the full-width "：" of CJK titles) or spaced dash (" - ", " – ",
+ * " — "). "Dune: Part Two" → ["Dune: Part Two", "Dune"]. Hyphens inside words
+ * ("Spider-Man") do not split.
  */
 export function titleVariants(title: string): string[] {
   const full = title.trim();

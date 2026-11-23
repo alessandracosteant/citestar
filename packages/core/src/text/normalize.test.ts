@@ -178,3 +178,17 @@ describe('normalizedTokens', () => {
     expect(normalizedTokens(normalizeTitle('', 'en'))).toEqual([]);
   });
 });
+
+describe('language tags and separators', () => {
+  it('accepts POSIX locale tags and surrounding spaces', () => {
+    expect(normalizeTitle('Il nome della rosa', 'it_IT')).toBe('nome della rosa');
+    expect(normalizeTitle('The Wall', ' EN ')).toBe('wall');
+  });
+
+  it('splits the main title at a full-width colon', () => {
+    expect(titleVariants('千と千尋の神隠し：特別版')).toEqual([
+      '千と千尋の神隠し：特別版',
+      '千と千尋の神隠し',
+    ]);
+  });
+});
