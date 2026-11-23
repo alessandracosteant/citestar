@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+
+# Supply-chain safety: only install versions published at least 14 days ago
+# (20160 minutes), so that a compromised release has time to be detected and
+# unpublished before it reaches us. Our own packages are exempt.
+minimumReleaseAge: 20160
+minimumReleaseAgeExclude:
+  - '@citestar/*'
