@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
 import { logSumExp, softmax } from './softmax.ts';
@@ -72,5 +73,44 @@ describe('softmax', () => {
     expect(() => softmax([1], -1)).toThrow(RangeError);
     expect(() => softmax([1], NaN)).toThrow(RangeError);
     expect(() => softmax([-Infinity])).toThrow(RangeError);
+  });
+});
+
+describe('softmax properties', () => {
+  // Bounded scores: with |s| up to 1e300 a shift would lose all precision.
+  const score = fc.double({ min: -500, max: 500, noNaN: true });
+  const scores = fc.array(score, { minLength: 1, maxLength: 20 });
+  const temperature = fc.double({ min: 0.05, max: 50, noNaN: true });
+
+  it('sums to 1, with every probability in [0, 1]', () => {
+    fc.assert(
+      fc.property(scores, temperature, (s, t) => {
+        const p = softmax(s, t);
+        const sum = p.reduce((a, b) => a + b, 0);
+        return Math.abs(sum - 1) < 1e-9 && p.every((x) => x >= 0 && x <= 1);
+      }),
+    );
+  });
+
+  it('is invariant to adding the same constant to every score', () => {
+    fc.assert(
+      fc.property(scores, score, temperature, (s, c, t) => {
+        const p = softmax(s, t);
+        const q = softmax(
+          s.map((x) => x + c),
+          t,
+        );
+        return p.every((x, i) => Math.abs(x - (q[i] ?? NaN)) < 1e-9);
+      }),
+    );
+  });
+
+  it('preserves the order of the scores', () => {
+    fc.assert(
+      fc.property(scores, temperature, (s, t) => {
+        const p = softmax(s, t);
+        return s.every((x, i) => s.every((y, j) => !(x > y) || (p[i] ?? NaN) >= (p[j] ?? NaN)));
+      }),
+    );
   });
 });
