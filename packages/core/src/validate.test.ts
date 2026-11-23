@@ -40,12 +40,24 @@ describe('validateTrack', () => {
     expect(validateTrack(track({ mentions: [mention({ workId: null })] }))).toEqual([]);
   });
 
-  it('accepts any minor or patch version of the same major', () => {
-    expect(validateTrack(track({ specVersion: '0.7.3-beta.1' }))).toEqual([]);
+  it('accepts other patch and pre-release versions of 0.1', () => {
+    expect(validateTrack(track({ specVersion: '0.1.7' }))).toEqual([]);
+    expect(validateTrack(track({ specVersion: '0.1.0-beta.1+build.5' }))).toEqual([]);
   });
 
-  it('rejects an unsupported major version and malformed versions', () => {
+  it('rejects another minor while the major is 0 (caret semantics)', () => {
+    // In 0.y, a minor bump may break compatibility.
+    expect(validateTrack(track({ specVersion: '0.2.0' }))).toEqual([
+      { path: '/specVersion', message: 'version 0.2.0 is not compatible with 0.1.0' },
+    ]);
+    expect(validateTrack(track({ specVersion: '0.0.9' }))[0]?.path).toBe('/specVersion');
+  });
+
+  it('rejects another major version and malformed versions', () => {
     expect(validateTrack(track({ specVersion: '1.0.0' }))[0]?.path).toBe('/specVersion');
+    expect(validateTrack(track({ specVersion: '01.1.0' }))[0]?.message).toMatch(
+      /not a semantic version/,
+    );
     expect(validateTrack(track({ specVersion: 'v0.1' }))[0]?.message).toMatch(
       /not a semantic version/,
     );

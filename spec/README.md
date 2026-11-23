@@ -62,9 +62,16 @@ The reference implementation is `validateTrack` in `@citestar/core`.
 
 ## Versioning and extensions
 
-The format follows [semantic versioning](https://semver.org): minor versions only add optional fields, so a
-reader accepts any track with the same major version. Unknown fields are rejected, except **extension fields**
-whose name starts with `x-` (e.g. `"x-reviewed": true`), allowed on the track, `content`, works and mentions.
+The format follows [semantic versioning](https://semver.org), with the same compatibility rule as npm's caret
+range (`^`):
+
+- from 1.0.0 on, minor versions only add optional fields, so a reader accepts any track with the same major
+  version;
+- while the major is 0, any minor bump may break compatibility (semver allows it), so a reader accepts only the
+  same major **and minor**: a 0.1.0 reader accepts 0.1.x, not 0.2.0.
+
+Unknown fields are rejected, except **extension fields** whose name starts with `x-` (e.g. `"x-reviewed": true`),
+allowed on the track, `content`, works and mentions.
 
 ## Coming later
 

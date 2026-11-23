@@ -11,6 +11,18 @@ const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 /**
+ * Same rule as npm's caret range (^): the major version must match and, while
+ * the major is 0, the minor too, because semantic versioning lets 0.y releases
+ * break compatibility at any minor bump. So a 0.1.0 reader accepts 0.1.x but
+ * not 0.2.0, and a 1.0.0 reader accepts any 1.y.z.
+ */
+function isCompatible(track: RegExpExecArray, reader: RegExpExecArray | null): boolean {
+  const [, major, minor] = track;
+  const [, readerMajor, readerMinor] = reader ?? [];
+  return major === readerMajor && (major !== '0' || minor === readerMinor);
+}
+
+/**
  * Checks the rules of a citation track that JSON Schema cannot express:
  * cross-references between works and mentions, uniqueness of ids, ordering of
  * time anchors and version compatibility. Run it after schema validation:
@@ -21,16 +33,16 @@ const SEMVER =
 export function validateTrack(track: CitationTrack): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
-  const major = SEMVER.exec(track.specVersion)?.[1];
-  if (major === undefined) {
+  const version = SEMVER.exec(track.specVersion);
+  if (version === null) {
     issues.push({
       path: '/specVersion',
       message: `not a semantic version: "${track.specVersion}"`,
     });
-  } else if (major !== SEMVER.exec(SPEC_VERSION)?.[1]) {
+  } else if (!isCompatible(version, SEMVER.exec(SPEC_VERSION))) {
     issues.push({
       path: '/specVersion',
-      message: `major version ${major} is not supported (expected ${SPEC_VERSION})`,
+      message: `version ${track.specVersion} is not compatible with ${SPEC_VERSION}`,
     });
   }
 
