@@ -11,6 +11,8 @@ Contents:
 3. [Wilson interval for precision targets](#3-wilson-interval-for-precision-targets)
 4. [Platt scaling with a shared slope](#4-platt-scaling-with-a-shared-slope)
 5. [Decomposing linking accuracy](#5-decomposing-linking-accuracy)
+6. [Title normalization and Jaro–Winkler similarity](#6-title-normalization-and-jarowinkler-similarity)
+7. [Softmax with temperature, computed safely](#7-softmax-with-temperature-computed-safely)
 
 ---
 
@@ -117,6 +119,17 @@ calibration. Exact binomial values versus this approximation:
 target of ECE ≤ 0.05 is only slightly above that floor, so a single number is not enough: we report a 95%
 **bootstrap** confidence interval. We resample the n predictions with replacement 2,000 times, recompute the ECE
 each time, and take the 2.5th and 97.5th percentiles.
+
+**Why the bootstrap works.** We do not know the distribution the predictions come from, but the sample is our
+best estimate of it (the empirical distribution, which puts mass 1/n on each observed point). Drawing n points
+with replacement from the sample simulates "collecting another dataset of the same size". The spread of the
+statistic across these simulated datasets estimates its sampling variability. Resamples come from a seeded
+pseudo-random generator (Mulberry32), so the interval is identical on every CI run.
+
+**Percentiles by interpolation.** With B sorted bootstrap values x₀ ≤ … ≤ x_{B−1}, the q-quantile is taken at
+position h = (B − 1)·q and interpolated linearly: x_⌊h⌋ + (h − ⌊h⌋)·(x\_⌊h⌋₊₁ − x_⌊h⌋). This is the definition
+used by default in R ("type 7") and NumPy, so our numbers can be reproduced there. Example: for [1, 2, 3, 4] and
+q = 0.25, h = 0.75 and the quantile is 1 + 0.75·(2 − 1) = 1.75.
 
 ---
 
@@ -227,3 +240,63 @@ so
 
 Both are reported separately. They are computed on mentions whose gold work exists (non-NIL); for NIL mentions
 the right outcome is abstaining, which is measured separately as NIL accuracy.
+
+---
+
+## 6. Title normalization and Jaro–Winkler similarity
+
+**Normalization** (`normalizeTitle`) removes differences of form before comparing titles: Unicode NFKD splits
+"é" into "e" + a combining accent, which is then dropped; compatibility characters expand (the ligature "ﬁ"
+becomes "fi"); case, punctuation and one leading article of the title's language ("the", "il", "l'") go away.
+"Il Nome della Rosa!" and "il nome della rosa" both become "nome della rosa". It does not translate: equivalence
+across languages comes from Wikidata labels.
+
+**Jaro similarity.** For strings a and b, two characters _match_ if they are equal and at most
+
+w = ⌊max(|a|, |b|) / 2⌋ − 1
+
+positions apart. Let m be the number of matches and t the number of transpositions, i.e. half the number of
+matched characters that appear in a different order in the two strings. Then
+
+J = (m/|a| + m/|b| + (m − t)/m) / 3, and J = 0 if m = 0.
+
+It averages three ratios: the share of a that matched, the share of b that matched, and the share of matches in
+the right order.
+
+Example, MARTHA vs MARHTA: w = 2, all 6 letters match, "TH" against "HT" puts 2 matched letters out of order, so
+t = 1 and J = (1 + 1 + 5/6)/3 = 17/18 ≈ 0.944.
+
+**Winkler's prefix bonus.** People make fewer mistakes at the start of a word, so a common prefix of length
+ℓ ≤ 4 raises the score:
+
+JW = J + ℓ · p · (1 − J), with p = 0.1.
+
+The bonus takes a fraction ℓ·p of the distance left to 1, so JW never exceeds 1 as long as ℓ·p ≤ 1 (hence ℓ ≤ 4
+with p = 0.1). It is applied only when J ≥ 0.7: otherwise "abcxyz" and "abcdef" (J = 2/3) would look similar just
+because they start the same way. For MARTHA: ℓ = 3, JW = 17/18 + 0.3·(1/18) ≈ 0.961.
+
+Why Jaro–Winkler for titles rather than edit distance: it is normalized to [0, 1] regardless of length, tolerant
+of small typos and ASR errors, and rewards matching beginnings, which is how people shorten titles ("Dune" for
+"Dune: Part Two" scores 0.86).
+
+---
+
+## 7. Softmax with temperature, computed safely
+
+**Softmax** turns candidate scores s₁…s_n into probabilities:
+
+P(i) = e^(sᵢ/T) / Σⱼ e^(sⱼ/T).
+
+Exponentials make every value positive and preserve order; dividing by the sum makes them add up to 1. The
+**temperature** T controls how decisive the distribution is. Two candidates with a score gap Δ have probability
+ratio e^(Δ/T): T → 0 gives all the mass to the best one, T → ∞ makes them equally likely. In linking, T is fitted
+on the dev set so that the probabilities are calibrated (§4).
+
+**Numerical safety (log-sum-exp).** e^1000 overflows a double. Softmax does not change if the same constant c is
+subtracted from every score, because e^(sᵢ − c) / Σⱼ e^(sⱼ − c) = e^(−c)·e^(sᵢ) / (e^(−c)·Σⱼ e^(sⱼ)). Choosing
+c = max sⱼ makes every exponent ≤ 0, so no term overflows, and the largest term equals 1, so the sum cannot
+underflow to 0. In log space:
+
+log Σⱼ e^(sⱼ) = M + log Σⱼ e^(sⱼ − M), with M = maxⱼ sⱼ,
+
+and P(i) = e^(sᵢ − logΣexp). A score of −∞ gets probability exactly 0, which lets us mask a candidate.
