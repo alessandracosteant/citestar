@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The core must run anywhere (browser, worker, server): no DOM and no
+    // Node globals. "lib" has no "DOM" and "types" is empty on purpose, so any
+    // accidental use of `document` or `process` is a type error.
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src"]
+}

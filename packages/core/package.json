@@ -1,0 +1,15 @@
+{
+  "name": "@citestar/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DOM-free pipeline: extract, detect, link, score, track.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json"
+  }
+}
