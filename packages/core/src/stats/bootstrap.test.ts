@@ -69,4 +69,16 @@ describe('bootstrapInterval', () => {
     expect(() => bootstrapInterval([1], mean, { iterations: 0 })).toThrow(RangeError);
     expect(() => bootstrapInterval([1], mean, { confidence: 1 })).toThrow(RangeError);
   });
+
+  it('rejects a statistic that returns NaN or ±∞ instead of returning a broken interval', () => {
+    expect(() => bootstrapInterval([1, 2, 3], () => NaN)).toThrow(/statistic returned NaN/);
+    expect(() => bootstrapInterval([1, 2, 3], () => Infinity)).toThrow(RangeError);
+  });
+
+  it('tolerates a random source that returns exactly 1', () => {
+    expect(bootstrapInterval([4, 4], mean, { iterations: 3, random: () => 1 })).toEqual({
+      lower: 4,
+      upper: 4,
+    });
+  });
 });

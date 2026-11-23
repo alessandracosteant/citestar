@@ -55,9 +55,15 @@ export function bootstrapInterval<T>(
   const sample = new Array<T>(n);
   for (let i = 0; i < iterations; i++) {
     for (let j = 0; j < n; j++) {
-      sample[j] = data[Math.floor(random() * n)] as T;
+      // min() guards against a custom source that returns exactly 1.
+      sample[j] = data[Math.min(n - 1, Math.floor(random() * n))] as T;
     }
-    stats.push(statistic(sample));
+    const value = statistic(sample);
+    // A NaN would silently break the sort below and return a meaningless interval.
+    if (!Number.isFinite(value)) {
+      throw new RangeError(`bootstrapInterval: statistic returned ${String(value)}`);
+    }
+    stats.push(value);
   }
   stats.sort((a, b) => a - b);
 

@@ -51,5 +51,7 @@ describe('wilsonInterval', () => {
     expect(() => wilsonInterval(-1, 4)).toThrow(RangeError);
     expect(() => wilsonInterval(1.5, 4)).toThrow(RangeError);
     expect(() => wilsonInterval(1, 4, 0)).toThrow(RangeError);
+    expect(() => wilsonInterval(1, 4, Infinity)).toThrow(RangeError);
+    expect(() => wilsonInterval(1, 4, NaN)).toThrow(RangeError);
   });
 });

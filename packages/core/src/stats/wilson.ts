@@ -24,7 +24,8 @@ export function wilsonInterval(successes: number, n: number, z = Z_95): Interval
   if (!Number.isInteger(successes) || successes < 0 || successes > n) {
     throw new RangeError('wilsonInterval: successes must be an integer in [0, n]');
   }
-  if (!(z > 0)) throw new RangeError('wilsonInterval: z must be > 0');
+  if (!(z > 0 && Number.isFinite(z)))
+    throw new RangeError('wilsonInterval: z must be finite and > 0');
 
   const p = successes / n;
   const z2 = z * z;
