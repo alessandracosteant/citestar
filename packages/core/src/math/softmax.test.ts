@@ -14,6 +14,11 @@ describe('logSumExp', () => {
     expect(logSumExp([1000, 1000])).toBeCloseTo(1000 + Math.log(2), 9);
   });
 
+  it('handles large arrays without overflowing the call stack', () => {
+    // log(300,000 · e^0) = log 300,000
+    expect(logSumExp(new Array<number>(300_000).fill(0))).toBeCloseTo(Math.log(300_000), 9);
+  });
+
   it('returns −∞ for an empty list or only −∞', () => {
     expect(logSumExp([])).toBe(-Infinity);
     expect(logSumExp([-Infinity, -Infinity])).toBe(-Infinity);

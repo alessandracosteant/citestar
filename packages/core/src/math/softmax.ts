@@ -8,9 +8,16 @@
  * Returns −∞ for an empty list or a list of −∞ values (sum of nothing is 0).
  */
 export function logSumExp(values: readonly number[]): number {
-  const max = Math.max(...values);
+  // A loop, not Math.max(...values): spreading a large array overflows the call
+  // stack (around 10⁵ elements).
+  let max = -Infinity;
+  for (const v of values) {
+    if (Number.isNaN(v) || v === Infinity) {
+      throw new RangeError('logSumExp: values must not be +∞ or NaN');
+    }
+    if (v > max) max = v;
+  }
   if (max === -Infinity) return -Infinity;
-  if (!Number.isFinite(max)) throw new RangeError('logSumExp: values must not be +∞ or NaN');
   let sum = 0;
   for (const v of values) sum += Math.exp(v - max);
   return max + Math.log(sum);
