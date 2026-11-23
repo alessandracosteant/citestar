@@ -10,6 +10,7 @@ Contents:
 2. [Expected Calibration Error and its noise floor](#2-expected-calibration-error-and-its-noise-floor)
 3. [Wilson interval for precision targets](#3-wilson-interval-for-precision-targets)
 4. [Platt scaling with a shared slope](#4-platt-scaling-with-a-shared-slope)
+5. [Decomposing linking accuracy](#5-decomposing-linking-accuracy)
 
 ---
 
@@ -52,11 +53,24 @@ around λ with standard deviation √λ, and with 2ᵇ buckets some fall well be
 
 A simulation with M = 10⁶ uniform hashes and b = 14 gave 7% of buckets below 50 and a smallest bucket of 32.
 
-**Strict variant (proposed).** The server knows every hash, so it can check the real minimum instead of the
+**Strict variant (adopted, D8).** The server knows every hash, so it can check the real minimum instead of the
 expected one: start from b = ⌊log₂(M / k)⌋ and decrease b while some bucket has fewer than k entries. In the same
 simulation this gives b = 13 (λ ≈ 122, smallest bucket 83). The cost is an occasional doubling of the response
-size; the counting is O(M) and runs only when the cache changes. Whether to adopt it is an open decision
-(see [DECISIONS.md](DECISIONS.md)).
+size; the counting is O(M). The server recomputes b at **every cache snapshot**, deletions included: removing
+entries can shrink a bucket below k, so b must be able to go down as well as up.
+
+**Popularity-aware anonymity (planned for M5).** Counting entries treats them as equally likely, but the server
+knows that some pages are requested far more often than others. If entry i in a bucket has popularity wᵢ, the
+server's best guess of which entry was requested has probability πᵢ = wᵢ / Σ_bucket w_j. The effective size of
+the anonymity set is
+
+k_eff(bucket) = 1 / maxᵢ πᵢ = 2^(H_∞), where H_∞ = −log₂ maxᵢ πᵢ is the min-entropy.
+
+With equal weights k_eff equals the bucket size; one dominant entry drives it towards 1. In M5 we simulate
+Zipf-distributed weights (w ∝ rank^(−s)) and report the distribution of k_eff here. We also evaluate a
+**head/tail** scheme: the summaries of the N most popular entries ship in bulk with the daily update and are
+matched locally, and only the tail goes through buckets. N is chosen from the simulation, trading downloaded
+bytes against the minimum k_eff.
 
 **What this does not protect.** k-anonymity is relative to the entries the server holds; it does not hide
 timing or network metadata. That is why the server keeps no IP logs. Querying the same URL later with a larger b
@@ -136,8 +150,21 @@ with z = 1.96 for 95%. The center is pulled from p̂ towards 1/2, and the width 
 | 1000    | ≥ 0.919                   |
 
 Small groups cannot pass the test: 25 out of 25 correct gives a lower bound of only 0.867. For this reason the
-precision target is checked on all mentions together (micro-average). Per work type we report the interval but
-do not gate on it, until each type has enough mentions.
+precision target is checked on all mentions together (micro-average).
+
+**Per-type guardrail with the upper bound (D9).** For a single work type we cannot prove that it is good, but we
+can detect evidence that it is **bad**: the CI fails when the **upper** bound of the 95% Wilson interval is below
+0.85. If even the most optimistic plausible precision is under 0.85, the type is worse than acceptable. For
+n = 25:
+
+| correct / 25 | errors | Wilson 95% interval | guardrail |
+| ------------ | ------ | ------------------- | --------- |
+| 19           | 6      | [0.566, 0.885]      | passes    |
+| 18           | 7      | [0.524, 0.857]      | passes    |
+| 17           | 8      | [0.484, 0.828]      | **fails** |
+| 16           | 9      | [0.445, 0.798]      | **fails** |
+
+So with 25 mentions the guardrail fires from 8 errors upwards. All per-type intervals are reported, gated or not.
 
 ---
 
@@ -177,3 +204,26 @@ simple because σ'(x) = σ(x)(1 − σ(x)):
 
 Following Platt, the targets are smoothed to y₊ = (N₊ + 1)/(N₊ + 2) and y₋ = 1/(N₋ + 2), where N₊ and N₋ are the
 numbers of positive and negative examples. This avoids overconfident probabilities on small sets.
+
+---
+
+## 5. Decomposing linking accuracy
+
+Linking has two stages: **candidate generation** (catalog searches return up to K = 20 candidates) and
+**ranking** (our score picks the first). Acc@1 alone does not say which stage fails.
+
+For a mention whose correct work is e\*, the top-ranked candidate can be e\* only if e\* was generated at all.
+By the law of total probability:
+
+P(top-1 = e\*) = P(e\* ∈ top-K) · P(top-1 = e\* | e\* ∈ top-K) + P(e\* ∉ top-K) · 0
+
+so
+
+**Acc@1 = Recall@K · P(first | correct among the K)**.
+
+- **Recall@K** measures the resolvers and the queries we send them. If it is low, no ranking can help: we need
+  better queries, more QIDs per type ([DECISIONS D7](DECISIONS.md)) or another catalog.
+- **P(first | correct among the K)** measures the scorer s(m, e). If it is low, we need better features or weights.
+
+Both are reported separately. They are computed on mentions whose gold work exists (non-NIL); for NIL mentions
+the right outcome is abstaining, which is measured separately as NIL accuracy.

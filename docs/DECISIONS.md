@@ -62,13 +62,52 @@ only for `@citestar/*`. TypeScript 6 instead of 7, because typescript-eslint doe
 gets labels, descriptions and sitelink counts in the same request. Verified live:
 [RESEARCH.md §1.4](RESEARCH.md#14-wikidata-filtering-candidates-by-work-type).
 
-## Open questions
+Verified on 2026-11-23 that `|` is a true OR (union): for "Dune", literary works 64 hits, films 71, both 0, OR
+135 = 64 + 71 − 0. One request covers a whole set of QIDs.
 
-- **Q1 — Strict k-anonymity.** b = ⌊log₂(M/k)⌋ guarantees k entries per bucket _on average_ only: with
-  M = 10⁶, 7% of buckets fall below 50 (smallest: 32). Proposal: the server decreases b until the smallest bucket
-  has at least k entries ([MATH.md §1](MATH.md#1-k-anonymous-lookup-in-the-shared-cache)). Needed by M5.
-- **Q2 — Per-type precision.** With about 25 test mentions per work type, even 25/25 correct gives a Wilson lower
-  bound of 0.867. Proposal: gate the precision target on the micro-average only and report per-type intervals
-  without gating.
-- **Q3 — Wikipedia in the test set.** Wikipedia text is CC BY-SA, not CC-BY. Should it count as an allowed real
-  source (with share-alike attribution in `eval/`), or stay out?
+## D8 — Strict k-anonymity (resolves Q1, 2026-11-23)
+
+The server decreases b until the smallest bucket has at least k entries, and recomputes b at every cache
+snapshot, deletions included. For M5: measure the popularity-aware anonymity k_eff = 1 / maxᵢ πᵢ with
+Zipf-distributed weights (proxy for popularity: sitelinks or number of cache contributions), report its
+distribution in MATH.md, and evaluate the "head locally, tail in buckets" scheme, choosing N from the simulation
+(downloaded bytes against minimum k_eff). See [MATH.md §1](MATH.md#1-k-anonymous-lookup-in-the-shared-cache).
+
+## D9 — Precision targets (resolves Q2, 2026-11-23)
+
+The precision target gates only the total (micro-average), on the lower bound of the 95% Wilson interval.
+Per-type guardrail: CI fails if, for any work type, the **upper** bound of the 95% Wilson interval is below 0.85
+(evidence that the type is worse). With n = 25 this fires from 8 errors upwards. All per-type intervals are
+reported. See [MATH.md §3](MATH.md#3-wilson-interval-for-precision-targets).
+
+## D10 — Wikipedia as an evaluation source (resolves Q3, 2026-11-23)
+
+- `eval/` stores **only annotations**: the revision `oldid` and the selectors. A script downloads the texts and
+  caches them (in CI with `actions/cache`).
+- `eval/` has its own `LICENSE` (**CC BY-SA 4.0**) and an `ATTRIBUTION` file with article and revision link. The
+  code stays Apache-2.0. `eval/` never enters an npm package (each package whitelists its `files`).
+- Wikilinks to works are **silver labels** (link target → QID), reviewed by hand. Usually only the first
+  occurrence is linked, so later mentions must be annotated too. The detector receives the text **without** links.
+- Wikipedia covers only the "documents" condition. Subtitles and ASR need spoken sources with a compatible license.
+
+## D11 — Linking evaluation split in two (2026-11-23)
+
+Report separately **Recall@K** of candidate generation (K = 20) and the precision of ranking, since
+Acc@1 = Recall@K · P(first | correct among the K). See [MATH.md §5](MATH.md#5-decomposing-linking-accuracy).
+
+## D12 — Purity guards for platform-independent packages (2026-11-23)
+
+`"types": []` only stops automatic inclusion: a dependency's `.d.ts` with `/// <reference types="node" />` can
+bring Node globals back. Pure packages (today `@citestar/core`) are therefore guarded three ways:
+
+1. tsconfig without DOM and Node types;
+2. an esbuild build with `platform: "neutral"` (`tools/neutral-build.ts`), which fails on imports of Node
+   built-ins, plus a test that the package's runtime dependencies are within an allowlist (empty today) and that
+   the bundle contains only the package's own sources;
+3. ESLint `no-restricted-globals` / `no-restricted-imports` on the package sources, for globals such as `process`
+   or `Buffer`, which are not imports and so escape the build check.
+
+## D13 — Git workflow (2026-11-23)
+
+The first push goes to `main`. From M1b on, every change lands through a feature branch and a pull request, so
+that CI gates the merge.

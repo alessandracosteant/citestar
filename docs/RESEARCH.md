@@ -56,8 +56,10 @@ with a user-provided key in settings, or through the self-hosted server's key.
 
 What we learned:
 
-- **Syntax** (official help page): `|` is OR inside one `haswbstatement`; two separate keywords are AND. Matching
-  is on the **direct** P31 value only: subclasses are not followed. Each `WorkType` therefore needs a small,
+- **Syntax** (official help page): `|` is OR inside one `haswbstatement`; two separate keywords are AND.
+  Verified by inclusion–exclusion on "Dune": literary work 64 hits, film 71, both (AND) 0, OR 135 = 64 + 71 − 0.
+  One request therefore covers a whole set of QIDs. Matching is on the **direct** P31 value only: subclasses are
+  not followed. Each `WorkType` therefore needs a small,
   curated set of QIDs (e.g. `song` = Q7366, Q134556, Q105543609), measured for coverage on the gold set.
 - **One request gives everything the scorer needs**: `generator=search` + `prop=entityterms|pageprops` with
   `wbetterms=label|description` and `ppprop=wb-sitelinks` returns label, description and the number of
