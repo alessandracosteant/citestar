@@ -13,6 +13,8 @@ Contents:
 5. [Decomposing linking accuracy](#5-decomposing-linking-accuracy)
 6. [Title normalization and Jaro–Winkler similarity](#6-title-normalization-and-jarowinkler-similarity)
 7. [Softmax with temperature, computed safely](#7-softmax-with-temperature-computed-safely)
+8. [Check digits of explicit identifiers](#8-check-digits-of-explicit-identifiers)
+9. [The Lite detection model](#9-the-lite-detection-model)
 
 ---
 
@@ -405,3 +407,119 @@ underflow to 0. In log space:
 log Σⱼ e^(sⱼ) = M + log Σⱼ e^(sⱼ − M), with M = maxⱼ sⱼ,
 
 and P(i) = e^(sᵢ − logΣexp). A score of −∞ gets probability exactly 0, which lets us mask a candidate.
+
+---
+
+## 8. Check digits of explicit identifiers
+
+An explicit identifier (ISBN, ISSN, DOI, arXiv) names exactly one work, so it skips the probabilistic detector and
+gets a fixed confidence: 0.99 with a check digit, 0.98 without (DOI, arXiv), because a well-formed identifier may
+still not exist. The check digit is what makes ISBNs and ISSNs trustworthy; this section shows what it catches.
+
+**ISBN-10.** With digits d₁…d₁₀ (the last may be X = 10), a valid ISBN satisfies
+
+Σᵢ₌₁¹⁰ (11 − i)·dᵢ ≡ 0 (mod 11).
+
+- _Every single-character error is detected._ Changing dᵢ by e ≠ 0 changes the sum by (11 − i)·e. Both factors
+  are between 1 and 10 in absolute value, and 11 is prime, so the product is never a multiple of 11.
+- _Every transposition is detected, adjacent or not._ Swapping a at position i with b at position j changes the
+  sum by ((11 − i) − (11 − j))·(b − a) = (j − i)·(b − a). Again both factors are non-zero and smaller than 11.
+
+**ISBN-13.** Weights alternate 1, 3, 1, 3, … and the sum must be ≡ 0 (mod 10); the prefix is 978 or 979.
+
+- _Every single-digit error is detected:_ the change is w·e with w ∈ {1, 3} and 0 < |e| ≤ 9, and neither e nor 3e
+  is a multiple of 10.
+- _Adjacent transpositions are missed exactly when the digits differ by 5._ Swapping a and b at weights 1 and 3
+  changes the sum by (3 − 1)·(a − b) = 2(a − b), and 2(a − b) ≡ 0 (mod 10) ⇔ a − b ≡ 0 (mod 5) ⇔ |a − b| = 5.
+  That is 10 of the 90 ordered pairs of distinct digits, about 11%. Example: in 978-0-306-40615-7, swapping the
+  adjacent 6 and 1 gives 978-0-306-40165-7, which is still valid. Mod 10 is the price of compatibility with
+  EAN-13 barcodes, which use the same rule.
+- _Transpositions two places apart are never detected:_ both positions have the same weight, so the sum does not
+  change at all.
+
+**ISSN.** Seven digits and a check character: Σᵢ₌₁⁸ (9 − i)·dᵢ ≡ 0 (mod 11), with X = 10. The ISBN-10 argument
+applies unchanged: every single error and every transposition is detected.
+
+**Why some schemes need a prefix.** For a random string of 10 digits, the check value that would make it a valid
+ISBN-10 is spread over 11 possibilities (0–9 and X), and the last digit matches it with probability
+(10/11)·(1/10) = 1/11. Phone numbers and other 10-digit numbers would therefore pass about once in 11 times, so a
+bare ISBN-10 is not accepted: it needs the "ISBN" prefix. The same holds for ISSNs (any "1990-2005" would pass
+1 time in 11) and for arXiv numbers, which look like decimals ("1706.03762"). A bare ISBN-13 must start with 978
+or 979 and pass its check: a random 13-digit number does so with probability (2/1000)·(1/10) = 1/5000.
+
+**DOI.** No check digit. We use Crossref's recommended pattern `10.\d{4,9}/[-._;()/:A-Z0-9]+` (case-insensitive),
+then remove the punctuation that belongs to the sentence: trailing ".", "," and ";", and a trailing ")" only when
+the DOI contains more ")" than "(" (so "10.1016/0002-9149(87)90136-1" keeps its balanced parentheses).
+
+**arXiv.** New style since April 2007: YYMM.NNNN (until December 2014) or YYMM.NNNNN (from January 2015), with
+month 01–12 and an optional version vN, which the canonical id drops. Old style: archive/YYMMNNN with a known
+archive (hep-th, math, cond-mat, …), from August 1991 to March 2007.
+
+---
+
+## 9. The Lite detection model
+
+**What it predicts.** For each candidate title the detector estimates p_m, the probability that the span really
+refers to a work, before any catalog lookup:
+
+p_m = σ(b + Σᵢ wᵢ·fᵢ), with σ(x) = 1 / (1 + e⁻ˣ).
+
+**Reading the weights.** The argument of σ is a log-odds: log(p / (1 − p)). Because it is a sum, each feature
+multiplies the odds by eʷ independently of the others: a weight of +2.4 multiplies the odds by e^2.4 ≈ 11, a
+weight of −0.5 by e^−0.5 ≈ 0.61. This is why weights can be reasoned about one at a time.
+
+**Priors (D19).** Until the gold set exists, the weights are hand-written priors. Each one is a judgement about how
+much a signal should change the odds; M1f replaces them with estimates.
+
+| Feature             |          w | × odds | Why                                                                                                                 |
+| ------------------- | ---------: | -----: | ------------------------------------------------------------------------------------------------------------------- |
+| bias b              |       −2.2 |        | A capitalized span with no other evidence is a title roughly one time in ten: σ(−2.2) ≈ 0.10.                       |
+| `cue`               |       +2.4 |    ×11 | "nel romanzo", "the film", "ho letto": a phrase that announces a work is the strongest single signal.               |
+| `author`            |       +1.2 |   ×3.3 | An author next to the span ("di Eco", "by Harari", "Lynch's", "come scrive X in").                                  |
+| `afterAuthorMarker` |       −2.0 |  ×0.14 | The span itself follows "by"/"di" after another title: it is the author ("Dune by **David Lynch**").                |
+| `quoted`            |       +1.8 |   ×6.0 | Quotation marks often enclose titles, but also speech and scare quotes, hence weaker than a cue.                    |
+| `italic`            |       +1.6 |   ×5.0 | Titles are set in italics, but so are foreign words and emphasis.                                                   |
+| `capStart`          |       +0.9 |   ×2.5 | A capital letter where it is not required.                                                                          |
+| `capStartIt`        |       −0.4 |  ×0.67 | Italian titles use sentence case: a capital is less specific, and Italian capitalizes fewer things that are titles. |
+| `capStartSubtitles` |       −0.3 |  ×0.74 | Subtitles are typed in a hurry; capitalization is a little less reliable.                                           |
+| `capStartAsr`       |       −1.0 |  ×0.37 | In ASR transcripts the speech model decides capitalization: a capital is weak evidence.                             |
+| `titleCaseEn`       |       +0.8 |   ×2.2 | English: two or more content words, all capitalized ("The Name of the Rose").                                       |
+| `sentenceInitial`   |       −0.9 |  ×0.41 | At the start of a sentence a capital is required, so it carries no information.                                     |
+| `singleWord`        |       −0.5 |  ×0.61 | Single capitalized words are mostly names of people and places.                                                     |
+| `longSpan`          |       −0.8 |  ×0.45 | More than 8 words looks like quoted speech rather than a title.                                                     |
+| `repeated`          | +0.3·ln(k) | ×k^0.3 | The same title proposed k times in the text: repetition is mild evidence.                                           |
+
+**Interactions (D17).** A plain "capital letter" feature would force one weight on situations that differ. With
+`capStart` plus `capStartIt`, `capStartSubtitles` and `capStartAsr`, the effect of a capital is 0.9 in English
+written text, 0.9 − 0.4 = 0.5 in Italian, and 0.9 − 1.0 = −0.1 in an English ASR transcript. A linear model
+cannot express "the effect of A depends on B" without such product features fᵢ = A·B.
+
+**Worked examples** (each checked by a test):
+
+| Text                                                | Active features                    |                              Score |   p_m |
+| --------------------------------------------------- | ---------------------------------- | ---------------------------------: | ----: |
+| "nel romanzo _Il nome della rosa_ di Eco" (it)      | cue, author, capStart, capStartIt  | −2.2 + 2.4 + 1.2 + 0.9 − 0.4 = 1.9 | 0.870 |
+| "As Harari argues in _Sapiens_," (en)               | cue, author, capStart, singleWord  |                                1.8 | 0.858 |
+| "the essay “_Politics and the English Language_”"   | cue, quoted, capStart, titleCaseEn |                                3.7 | 0.976 |
+| "ho letto _il nome della rosa_" (it, ASR)           | cue                                |                                0.2 | 0.550 |
+| "I loved _The Name of the Rose_ last year" (no cue) | capStart, titleCaseEn              |                               −0.5 | 0.378 |
+
+Candidates below p_m = 0.25 are dropped before linking: fewer catalog queries, and fewer strings leave the device.
+The others carry their p_m into linking, where catalog evidence is added.
+
+**Why p_m is not the final confidence.** Detection only sees the text. The final p = p_m · P(e|m) multiplies it
+by the linking probability (§3 of the spec), and in M1e the strength of the catalog match becomes a feature of
+p_m itself. The decision threshold p* = 0.80 applies to the final p, after calibration (§4).
+
+**From priors to estimates (M1f).** The weights will be fitted by logistic regression, minimizing the log-loss
+plus an L2 penalty λ‖w‖². The penalty matters because the features are correlated (a cue is often followed by a
+capital; quotes and italics co-occur) and the gold set is small: without it, correlated weights can grow large
+with opposite signs and overfit. L2 is equivalent to assuming a Gaussian prior w ~ N(0, 1/(2λ)) on each weight
+and taking the most probable weights given the data (MAP): small weights are preferred unless the data insist.
+
+**Title windows (D18).** A candidate carries its start and every possible end between e_min and e_max, not a
+single span. The window is closed by punctuation, by "di/by <Name>", and by hard stops (verbs, relative pronouns,
+time adverbs); conjunctions and, in Italian, prepositions are soft stops after which the window may run 3 more
+words, so that "Guerra e pace" and "Pride and Prejudice" stay reachable. In English, a title that starts with a
+capital ends at the first lowercase content word (Title Case). In M1e each window becomes one catalog query, and
+the end is chosen as ê = argmax_e max_c s(m_{start..e}, c).
