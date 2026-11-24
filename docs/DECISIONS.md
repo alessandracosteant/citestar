@@ -150,6 +150,31 @@ See [MATH.md §2.1–2.2](MATH.md#21-stratification-explicit-identifiers-dilute-
   `logSumExp` no longer overflows the call stack on large arrays; `normalizeTitle` accepts POSIX locale tags
   (`it_IT`).
 
+## D22 — Lite detection as built in M1c (2026-11-24)
+
+Implements D16–D19. Choices made while building it, to review:
+
+- **Prefixes for weak schemes.** A bare ISBN-10 or ISSN passes its check digit 1 time in 11 by chance, and arXiv
+  numbers look like decimals, so they are recognized only after "ISBN", "ISSN", "arXiv:" or a URL. A bare ISBN-13
+  (978/979 + check digit) is accepted. See [MATH.md §8](MATH.md#8-check-digits-of-explicit-identifiers).
+- **Fixed p for identifiers:** 0.99 with a check digit (ISBN, ISSN), 0.98 without (DOI, arXiv).
+- **Candidates with p_m < 0.25 are dropped before linking**, to limit catalog queries and the strings that leave
+  the device.
+- **Soft stops (refines D18).** D18 closes the window on conjunctions. Closing hard on "e"/"and" makes "Guerra e
+  pace" and "Pride and Prejudice" unreachable, so conjunctions (and Italian prepositions, common in sentence-case
+  titles such as "Ritorno al futuro") are soft stops: the window may run 3 more words after them. Hard stops
+  remain punctuation, "di/by <Name>", verbs, relative pronouns and time adverbs.
+- **Title Case in English.** A window that starts with a capital ends at the first lowercase content word, unless
+  connectors lead to another capital ("Gone with the Wind"). Not applied to ASR, whose capitals are unreliable.
+- **Start rule.** The first content word after leading articles cannot be a stop word, a possessive or a cue noun:
+  "We saw _the film Dune_" and "ho letto _il suo libro_" are not titles (the inner cue proposes the right one).
+- **New feature `afterAuthorMarker` (−2.0).** A span after "by"/"di" that itself follows another title is the
+  author ("Dune by David Lynch"). Requiring the preceding title keeps Italian "parlato di Sapiens" (di = about)
+  unpenalized.
+- **Known limitations of Lite**, to be measured on the gold set: titles that contain a verb or a hard stop ("La
+  vita è bella") are truncated; titles that contain a comma are cut at it; Italian sentence-case titles with no
+  cue, quotes or italics are not proposed; author-only references ("il paper di Vaswani") produce no title.
+
 ## Planned for later milestones (from the M1b review, 2026-11-23)
 
 ### D16 — Explicit identifiers (M1c)

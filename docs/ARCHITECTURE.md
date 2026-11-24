@@ -1,7 +1,7 @@
 # Architecture
 
-_Status as of M1b: the core primitives exist (model, validation, normalization, similarity, softmax,
-statistics). Everything else below is the plan._
+_Status as of M1c: the core primitives (model, validation, normalization, similarity, softmax,
+statistics) and Lite detection exist. Everything else below is the plan._
 
 ## Pipeline
 
@@ -52,19 +52,25 @@ testable without mocks and lets it run unchanged in the extension, the embed scr
 | `eval/`              | Gold set annotations (CC BY-SA 4.0) and metric scripts                       | M1f    |
 | `tools/`             | Build and repository checks (neutral build, purity, packed-package consumer) | M1a    |
 
-## Core modules (M1b)
+## Core modules (M1b, M1c)
 
-| Module                 | Exports                                                               |
-| ---------------------- | --------------------------------------------------------------------- |
-| `model.ts`             | `CitationTrack`, `Work`, `Mention`, `Anchor`, `WORK_TYPES`            |
-| `validate.ts`          | `validateTrack`: rules JSON Schema cannot express                     |
-| `text/normalize.ts`    | `normalizeTitle` (idempotent), `titleVariants`, `Normalized` brand    |
-| `text/jaro-winkler.ts` | `jaro`, `jaroWinkler`                                                 |
-| `math/softmax.ts`      | `softmax`, `logSumExp`                                                |
-| `stats/wilson.ts`      | `wilsonInterval`                                                      |
-| `stats/ece.ts`         | `expectedCalibrationError`, `calibrationTest`, `calibrationByStratum` |
-| `stats/bootstrap.ts`   | `bootstrapInterval`, `quantile`                                       |
-| `stats/random.ts`      | `mulberry32` (seeded PRNG for reproducible evaluation)                |
+| Module                  | Exports                                                               |
+| ----------------------- | --------------------------------------------------------------------- |
+| `model.ts`              | `CitationTrack`, `Work`, `Mention`, `Anchor`, `WORK_TYPES`            |
+| `validate.ts`           | `validateTrack`: rules JSON Schema cannot express                     |
+| `text/normalize.ts`     | `normalizeTitle` (idempotent), `titleVariants`, `Normalized` brand    |
+| `text/jaro-winkler.ts`  | `jaro`, `jaroWinkler`                                                 |
+| `math/softmax.ts`       | `softmax`, `logSumExp`                                                |
+| `stats/wilson.ts`       | `wilsonInterval`                                                      |
+| `stats/ece.ts`          | `expectedCalibrationError`, `calibrationTest`, `calibrationByStratum` |
+| `stats/bootstrap.ts`    | `bootstrapInterval`, `quantile`                                       |
+| `stats/random.ts`       | `mulberry32` (seeded PRNG for reproducible evaluation)                |
+| `math/logistic.ts`      | `sigmoid`, `logit`                                                    |
+| `detect/identifiers.ts` | `findIdentifiers` and check-digit validators (ISBN, ISSN, DOI, arXiv) |
+| `detect/tokens.ts`      | `tokenize` with offsets, `isCapitalized`, `isSentenceInitial`         |
+| `detect/lexicon.ts`     | Cue phrases, stops and connectors for Italian and English             |
+| `detect/features.ts`    | Feature names, `PRIOR_WEIGHTS`, `mentionProbability`                  |
+| `detect/detect.ts`      | `detectMentions`: title windows with p_m, and identifiers             |
 
 ## Platform independence
 
