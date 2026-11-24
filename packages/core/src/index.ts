@@ -28,6 +28,40 @@ export { jaro, jaroWinkler } from './text/jaro-winkler.ts';
 export type { JaroWinklerOptions } from './text/jaro-winkler.ts';
 
 export { logSumExp, softmax } from './math/softmax.ts';
+export { logit, sigmoid } from './math/logistic.ts';
+
+export { DEFAULT_MIN_P, detectMentions } from './detect/detect.ts';
+export type {
+  DetectInput,
+  DetectOptions,
+  IdentifierCandidate,
+  MentionCandidate,
+  Signal,
+  Span,
+  TextSource,
+  TitleCandidate,
+} from './detect/detect.ts';
+export {
+  FEATURE_NAMES,
+  linearScore,
+  mentionProbability,
+  PRIOR_WEIGHTS,
+} from './detect/features.ts';
+export type { DetectionWeights, FeatureName, FeatureVector } from './detect/features.ts';
+export {
+  findIdentifiers,
+  IDENTIFIER_P,
+  isbn10To13,
+  isValidArxivNew,
+  isValidArxivOld,
+  isValidIsbn10,
+  isValidIsbn13,
+  isValidIssn,
+  trimDoi,
+} from './detect/identifiers.ts';
+export type { IdentifierMatch, IdentifierScheme } from './detect/identifiers.ts';
+export { isCapitalized, isSentenceInitial, tokenize } from './detect/tokens.ts';
+export type { Token } from './detect/tokens.ts';
 
 export { wilsonInterval, Z_95 } from './stats/wilson.ts';
 export type { Interval } from './stats/wilson.ts';
